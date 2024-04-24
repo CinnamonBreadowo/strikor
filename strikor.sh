@@ -1,3 +1,4 @@
+Convert this to python
 #!/bin/bash
 # inspired by @21y4d and @wirzka
 # crafted by @CinnamonBreadowo
@@ -10,20 +11,13 @@ PURPLE='\033[1;35m'
 NC='\033[0m'
 origIFS="${IFS}"
 
-printf "${GREEN}"
-printf "    ____                                        \n"
-printf "   / __ )_________ _____ ___  _____  __  _______\n"
-printf "  / __  / ___/ __ \/ __ \/ / / / _ \/ / / / ___/\n"
-printf " / /_/ / /  / /_/ / /_/ / /_/ /  __/ /_/ / /    \n"
-printf "/_____/_/   \__,_/\__, /\__,_/\___/\__,_/_/     \n"
-printf "                    /_/                         \n"
-printf "              @CinnamonBreadowo                 \n"
+printf "header"
 
 # Start timer
 elapsedStart="$(date '+%H:%M:%S' | awk -F: '{print $1 * 3600 + $2 * 60 + $3}')"
 
 #Assign Host
-HOST="$1"
+HOST="$2"
 
 # Parse flags
 while [ $# -gt 0 ]; do
@@ -87,7 +81,7 @@ usage() {
 header() {
         echo
         # Print scan type
-        printf "${GREEN}Poor little ${NC}${PURPLE}${HOST}${NC}, they won't know what hit them..."
+        printf "${GREEN}Scanning ${NC}${PURPLE}${HOST}${NC}..."
 
         if expr "${HOST}" : '^\(\([[:alnum:]-]\{1,63\}\.\)*[[:alpha:]]\{2,6\}\)$' >/dev/null; then
                 urlIP="$(host -4 -W 1 ${HOST} ${DNSSERVER} 2>/dev/null | grep ${HOST} | head -n 1 | awk {'print $NF'})"
@@ -109,16 +103,6 @@ header() {
         kernel="$(uname -s)"
         checkPing="$(checkPing "${urlIP:-$HOST}")"
         nmapType="$(echo "${checkPing}" | head -n 1)"
-
-        # # Set if host is pingable 'for ping scans'
-        # if expr "${nmapType}" : ".*-Pn$" >/dev/null; then
-        #         pingable=false
-        #         printf "${NC}\n"
-        #         printf "${YELLOW}No ping detected.. Will not use ping scans!\n"
-        #         printf "${NC}\n"
-        # else
-        #         pingable=true
-        # fi
 
         # OS Detection
         ttl="$(echo "${checkPing}" | tail -n 1)"
@@ -225,16 +209,16 @@ nmapProgressBar() {
 # do a full TCP SYN scan if id=0 or connect scan
 portScan() {
         if [ "${USER}" != 'root' ]; then
-                echo "${RED}[!] ALERT"
-                echo "${RED}>${NC} Nmap needs to be run as root, otherwise it'll do a connect scan instead of a SYN scan."
+                echo -e "${RED}[!] ALERT"
+                echo -e "${RED}>${NC} Nmap needs to be run as root, otherwise it'll do a connect scan instead of a SYN scan."
 
                 # asking if user wants to run nmap as root or not
-                echo "${RED}>${NC} To sudo or not to sudo? y/n \n"
+                echo -e "${RED}>${NC} To sudo or not to sudo? y/n \n"
                 read sudoOrNot
 
                 # if user wants to proceed without root
                 if [ $sudoOrNot != "y" ]; then
-                        echo
+                        echo 
 
                         printf "${YELLOW}[*] Full TCP port scan launched\n${NC}"
 
@@ -243,9 +227,9 @@ portScan() {
 
                 # in the case the user wants sudo
                 else
-                        echo
+                        echo 
 
-                        echo "${RED}>${NC} Running with sudo..."
+                        echo -e "${RED}>${NC} Running with sudo..."
                         sudo -v
 
                         printf "\n${YELLOW}[*] Full TCP port scan launched\n${NC}"
@@ -479,10 +463,6 @@ reconRecommend() {
                                 if echo "${line}" | grep -q ssl/http; then
                                         urlType='https://'
                                         echo "sslscan \"${HOST}\" | tee \"recon/sslscan_${HOST}_${port}.txt\""
-                                fi
-                                if type ffuf >/dev/null 2>&1; then
-                                        extensions="$(echo 'index' >./index && ffuf -s -w ./index:FUZZ -mc '200,302' -e '.asp,.aspx,.html,.jsp,.php' -u "${urlType}${HOST}:${port}/FUZZ" 2>/dev/null | awk -vORS=, -F 'index' '{print $2}' | sed 's/.$//' && rm ./index)"
-                                        echo "ffuf -ic -w /usr/share/wordlists/dirb/common.txt -e '${extensions}' -u \"${urlType}${HOST}:${port}/FUZZ\" | tee \"recon/ffuf_${HOST}_${port}.txt\""
                                 fi
                         fi
                 done
