@@ -23,11 +23,6 @@ while [ $# -gt 0 ]; do
         key="$1"
 
         case "${key}" in
-        -d | --dns)
-                DNS="$2"
-                shift
-                shift
-                ;;
         -o | --output)
                 OUTPUTDIR="$2"
                 shift
@@ -41,15 +36,6 @@ while [ $# -gt 0 ]; do
 TYPE="All"
 done
 set -- ${POSITIONAL}
-
-# Set DNS or default to system DNS
-if [ -n "${DNS}" ]; then
-        DNSSERVER="${DNS}"
-        DNSSTRING="--dns-server=${DNSSERVER}"
-else
-        DNSSERVER="$(grep 'nameserver' /etc/resolv.conf | grep -v '#' | head -n 1 | awk {'print $NF'})"
-        DNSSTRING="--system-dns"
-fi
 
 # Set output dir or default to host-based dir
 if [ -z "${OUTPUTDIR}" ]; then
@@ -68,7 +54,7 @@ fi
 usage() {
         echo
         printf "${GREEN}Usage:${NC} ${RED}$(basename $0) -H ${NC}<TARGET-IP>${RED}"
-        printf "${YELLOW}Optional: [-d/--dns ${NC}<DNS SERVER>${YELLOW}] [-o/--output ${NC}<OUTPUT DIRECTORY>${YELLOW}]${NC}\n\n"
+        printf "${YELLOW}Optional: [-o/--output ${NC}<OUTPUT DIRECTORY>${YELLOW}]${NC}\n\n"
         printf "${CYAN}\tAll     : ${NC}Runs all the scans (you have no choice :3) ${YELLOW}\n"
         printf "${NC}\n"
         printf "inspired by ${PURPLE}@21y4d${NC} and ${PURPLE}@wirzka${NC}, modified by ${PURPLE}@CinnamonBreadowo${NC}\n"
@@ -81,18 +67,6 @@ header() {
         echo
         # Print scan type
         printf "${GREEN}Scanning ${NC}${PURPLE}${HOST}${NC}..."
-
-        if expr "${HOST}" : '^\(\([[:alnum:]-]\{1,63\}\.\)*[[:alpha:]]\{2,6\}\)$' >/dev/null; then
-                urlIP="$(host -4 -W 1 ${HOST} ${DNSSERVER} 2>/dev/null | grep ${HOST} | head -n 1 | awk {'print $NF'})"
-                if [ -n "${urlIP}" ]; then
-                        printf "${YELLOW} with IP ${NC}${urlIP}\n\n"
-                else
-                        printf ".. ${RED}Could not resolve IP of ${NC}${HOST}\n\n"
-                fi
-        else
-                printf "\n"
-        fi
-
         # Set $subnet variable
         if expr "${HOST}" : '^\([0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\)$' >/dev/null; then
                 subnet="$(echo "${HOST}" | cut -d "." -f 1,2,3).0"
@@ -221,7 +195,7 @@ portScan() {
 
                         printf "${YELLOW}[*] Full TCP port scan launched\n${NC}"
 
-                        nmapProgressBar "${nmapType} -T4 -p- --max-retries 2 -vv --max-scan-delay 30 -Pn --open -oN nmap/full_TCP_${HOST}.nmap ${HOST} ${DNSSTRING}"
+                        nmapProgressBar "${nmapType} -T4 -p- --max-retries 2 -vv --max-scan-delay 30 -Pn --open -oN nmap/full_TCP_${HOST}.nmap ${HOST} "
                         assignPorts "${HOST}"
 
                 # in the case the user wants sudo
@@ -232,7 +206,7 @@ portScan() {
                         sudo -v
 
                         printf "\n${YELLOW}[*] Full TCP port scan launched\n${NC}"
-                        nmapProgressBar "sudo ${nmapType} -T4 -p- --max-retries 2 -vv --max-scan-delay 30 -Pn --open -oN nmap/full_TCP_${HOST}.nmap ${HOST} ${DNSSTRING}"
+                        nmapProgressBar "sudo ${nmapType} -T4 -p- --max-retries 2 -vv --max-scan-delay 30 -Pn --open -oN nmap/full_TCP_${HOST}.nmap ${HOST} "
                         assignPorts "${HOST}"
 
                         echo
@@ -243,7 +217,7 @@ portScan() {
                 printf "${YELLOW}[*] Full TCP port scan launched\n"
                 printf "${NC}\n"
 
-                nmapProgressBar "${nmapType} -T4 -p- --max-retries 2 -vv --max-scan-delay 30 -Pn --open -oN nmap/full_TCP_${HOST}.nmap ${HOST} ${DNSSTRING}"
+                nmapProgressBar "${nmapType} -T4 -p- --max-retries 2 -vv --max-scan-delay 30 -Pn --open -oN nmap/full_TCP_${HOST}.nmap ${HOST} "
                 assignPorts "${HOST}"
 
                 echo
@@ -261,7 +235,7 @@ scriptScan() {
         if [ -z "${ports}" ]; then
                 printf "${YELLOW}No ports in port scan.. Skipping!\n"
         else
-                nmapProgressBar "${nmapType} -Pn -sCV -p${ports} --open -oN nmap/Script_TCP_${HOST}.nmap ${HOST} ${DNSSTRING}" 2
+                nmapProgressBar "${nmapType} -Pn -sCV -p${ports} --open -oN nmap/Script_TCP_${HOST}.nmap ${HOST} " 2
         fi
 
         # Modify detected OS if Nmap detects a different OS
@@ -293,7 +267,7 @@ UDPScan() {
                 echo
         fi
 
-        nmapProgressBar "sudo ${nmapType} -sU --max-retries 1 --open --open -oN nmap/UDP_${HOST}.nmap ${HOST} ${DNSSTRING}" 3
+        nmapProgressBar "sudo ${nmapType} -sU --max-retries 1 --open --open -oN nmap/UDP_${HOST}.nmap ${HOST} " 3
         assignPorts "${HOST}"
 
         # Nmap version and default script scan on found UDP ports
@@ -304,10 +278,10 @@ UDPScan() {
                 printf "${NC}\n"
                 if [ -f /usr/share/nmap/scripts/vulners.nse ]; then
                         sudo -v
-                        nmapProgressBar "sudo nmap -Pn -sCVU --script vulners --script-args mincvss=7.0 -p${udpPorts} --open -oN nmap/UDP_Extra_${HOST}.nmap ${HOST} ${DNSSTRING}" 2
+                        nmapProgressBar "sudo nmap -Pn -sCVU --script vulners --script-args mincvss=7.0 -p${udpPorts} --open -oN nmap/UDP_Extra_${HOST}.nmap ${HOST}" 2
                 else
                         sudo -v
-                        nmapProgressBar "sudo nmap -Pn -sCVU -p${udpPorts} --open -oN nmap/UDP_Extra_${HOST}.nmap ${HOST} ${DNSSTRING}" 2
+                        nmapProgressBar "sudo nmap -Pn -sCVU -p${udpPorts} --open -oN nmap/UDP_Extra_${HOST}.nmap ${HOST} " 2
                 fi
         else
                 echo
@@ -336,7 +310,7 @@ vulnsScan() {
         else
                 printf "${YELLOW}> Running CVE scan on ${portType} ports\n"
                 printf "${NC}\n"
-                nmapProgressBar "nmap -sV -Pn --script vulners --script-args mincvss=7.0 -p${ports} --open -oN nmap/CVEs_${HOST}.nmap ${HOST} ${DNSSTRING}" 3
+                nmapProgressBar "nmap -sV -Pn --script vulners --script-args mincvss=7.0 -p${ports} --open -oN nmap/CVEs_${HOST}.nmap ${HOST} " 3
                 echo
         fi
 
@@ -345,7 +319,7 @@ vulnsScan() {
         printf "${YELLOW}> Running Vuln scan on ${portType} ports\n"
         printf "${YELLOW}Go for a walk if the target's got a lot of ports :)\n"
         printf "${NC}\n"
-        nmapProgressBar "nmap -sV -Pn --script vuln -p${ports} --open -oN nmap/Vulns_${HOST}.nmap ${HOST} ${DNSSTRING}" 3
+        nmapProgressBar "nmap -sV -Pn --script vuln -p${ports} --open -oN nmap/Vulns_${HOST}.nmap ${HOST} " 3
 
         echo
 }
